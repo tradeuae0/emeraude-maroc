@@ -4,7 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Emeraude Maroc - Mon QR</title>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+
+  <!-- QR generator (très fiable) -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
   <style>
     :root{--bg:#0f0f0f;--card:#161616;--text:#f2f2f2;--muted:#b8b8b8;--green:#1DB954;--line:#262626;}
     body{margin:0;font-family:system-ui;background:var(--bg);color:var(--text)}
@@ -13,68 +16,68 @@
     .btn{border:none;border-radius:12px;padding:10px 12px;font-weight:800;cursor:pointer;background:var(--green);color:#07130b}
     .ghost{background:transparent;color:var(--text);border:1px solid var(--line)}
     .muted{color:var(--muted);font-size:13px}
-    #qrImg{width:260px;height:260px;border-radius:16px;border:1px solid var(--line);background:#101010;display:block;margin:12px auto}
     .row{display:flex;gap:10px;flex-wrap:wrap}
     input{width:100%;background:#101010;color:var(--text);border:1px solid var(--line);border-radius:12px;padding:12px;font-size:14px}
+    #qrWrap{display:flex;justify-content:center;align-items:center;padding:12px;background:#101010;border:1px dashed var(--line);border-radius:16px;margin-top:12px}
   </style>
 </head>
 <body>
 <main>
   <div class="card">
     <h2 style="margin:0">Emeraude Maroc • Carte Fidélité</h2>
-    <div class="muted">Garde ce QR (screenshot). Présente-le en caisse.</div>
+    <div class="muted">Génère ton QR, puis fais un screenshot et garde-le.</div>
 
-    <img id="qrImg" alt="QR" />
+    <div id="qrWrap">
+      <div id="qr"></div>
+    </div>
 
-    <div class="muted">Ton ID :</div>
+    <div class="muted" style="margin-top:12px">Ton ID :</div>
     <input id="idBox" readonly />
 
     <div class="row" style="margin-top:12px">
       <button class="btn" id="btnNew">Générer mon QR</button>
-      <button class="btn ghost" id="btnDownload">Télécharger PNG</button>
+      <button class="btn ghost" id="btnClear">Effacer</button>
     </div>
 
-    <div class="muted" style="margin-top:10px">
-      Règle : 1 achat = 1 point • Expire après 1 an (à gérer plus tard si tu veux).
-    </div>
+    <div id="msg" class="muted" style="margin-top:10px"></div>
   </div>
 </main>
 
 <script>
-  const qrImg = document.getElementById("qrImg");
+  const qrDiv = document.getElementById("qr");
   const idBox = document.getElementById("idBox");
+  const msg = document.getElementById("msg");
 
   function randomId() {
-    // ID simple, unique, facile: EM-XXXXXX
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     let s = "EM-";
     for (let i = 0; i < 8; i++) s += chars[Math.floor(Math.random() * chars.length)];
     return s;
   }
 
-  async function makeQr(id) {
-    const payload = id; // QR contient juste l'ID (ex: EM-xxxx)
-    const url = await QRCode.toDataURL(payload, { width: 260, margin: 2 });
-    qrImg.src = url;
-    idBox.value = payload;
+  function renderQr(id){
+    qrDiv.innerHTML = ""; // clear old qr
+    // QRCode lib creates an <img> or <canvas> inside #qr
+    new QRCode(qrDiv, {
+      text: id,
+      width: 240,
+      height: 240,
+      correctLevel: QRCode.CorrectLevel.M
+    });
+    idBox.value = id;
   }
 
-  document.getElementById("btnNew").onclick = async () => {
+  document.getElementById("btnNew").onclick = () => {
     const id = randomId();
-    await makeQr(id);
-    alert("✅ Fais un screenshot de ton QR maintenant.");
+    renderQr(id);
+    msg.textContent = "✅ QR généré. Fais un screenshot maintenant.";
   };
 
-  document.getElementById("btnDownload").onclick = () => {
-    if (!qrImg.src) return alert("Génère un QR d'abord.");
-    const a = document.createElement("a");
-    a.href = qrImg.src;
-    a.download = "EmeraudeMaroc_QR.png";
-    a.click();
+  document.getElementById("btnClear").onclick = () => {
+    qrDiv.innerHTML = "";
+    idBox.value = "";
+    msg.textContent = "";
   };
-
-  // Auto: si déjà généré dans cette page (même navigateur)
-  // (optionnel) — sinon client clique "Générer"
 </script>
 </body>
 </html>
