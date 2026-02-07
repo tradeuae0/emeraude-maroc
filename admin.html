@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Emeraude Maroc - Admin</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <style>
+    :root{--bg:#0f0f0f;--card:#161616;--text:#f2f2f2;--muted:#b8b8b8;--green:#1DB954;--red:#E53935;--line:#262626;}
+    body{margin:0;font-family:system-ui;background:var(--bg);color:var(--text)}
+    main{max-width:980px;margin:0 auto;padding:16px}
+    .grid{display:grid;gap:14px}
+    @media(min-width:860px){.grid{grid-template-columns:1fr 1fr}}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}
+    .muted{color:var(--muted);font-size:13px}
+    .btn{border:none;border-radius:12px;padding:10px 12px;font-weight:800;cursor:pointer}
+    .g{background:var(--green);color:#07130b}
+    .r{background:var(--red);color:#1a0606}
+    .ghost{background:transparent;color:var(--text);border:1px solid var(--line)}
+    input,textarea{width:100%;background:#101010;color:var(--text);border:1px solid var(--line);border-radius:12px;padding:12px;font-size:14px}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .sp{justify-content:space-between}
+    #reader{width:100%}
+    .big{font-size:34px;font-weight:900}
+    table{width:100%;border-collapse:collapse}
+    td,th{border-bottom:1px solid var(--line);padding:10px;text-align:left}
+    .ok{color:var(--green);font-weight:800}
+    .warn{color:var(--red);font-weight:800}
+  </style>
+</head>
+<body>
+<main>
+  <div class="row sp" style="margin-bottom:12px">
+    <div>
+      <div style="font-weight:900">Emeraude Maroc • Admin</div>
+      <div class="muted">QR scan + points (stockés localement sur cet appareil)</div>
+    </div>
+    <button id="btnResetAll" class="btn ghost">Reset base</button>
+  </div>
+
+  <!-- Login simple -->
+  <div id="loginCard" class="card" style="max-width:520px;margin:0 auto 14px auto;">
+    <h3 style="margin:0 0 6px 0">Connexion Admin</h3>
+    <div class="muted">Mot de passe (simple) pour bloquer les clients.</div>
+    <div style="height:10px"></div>
+    <input id="adminPass" type="password" placeholder="Mot de passe admin" />
+    <div style="height:10px"></div>
+    <button id="btnLogin" class="btn g" style="width:100%">Entrer</button>
+    <div id="loginMsg" class="muted" style="margin-top:8px"></div>
+  </div>
+
+  <div id="adminArea" class="grid" style="display:none">
+    <div class="card">
+      <h3 style="margin:0">Scanner QR client</h3>
+      <div class="muted">Scanne le screenshot QR du client. Puis ajoute +1/+2/+3.</div>
+      <div style="height:10px"></div>
+      <div id="reader"></div>
+
+      <div style="height:12px"></div>
+      <div class="row sp">
+        <div>
+          <div class="muted">Client</div>
+          <div id="clientId" class="warn">Aucun</div>
+        </div>
+        <div>
+          <div class="muted">Points</div>
+          <div id="clientPoints" class="big">0</div>
+        </div>
+      </div>
+
+      <div style="height:12px"></div>
+      <div class="row">
+        <button id="btn1" class="btn g" disabled>+1</button>
+        <button id="btn2" class="btn g" disabled>+2</button>
+        <button id="btn3" class="btn g" disabled>+3</button>
+        <button id="btnMinus" class="btn ghost" disabled>-1</button>
+      </div>
+
+      <div id="adminMsg" class="muted" style="margin-top:10px"></div>
+      <div class="muted" style="margin-top:6px">Anti-abus: 1 ajout max / 10 secondes par QR.</div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0">Clients (sur cet appareil)</h3>
+      <div class="muted">Tu peux exporter/importer pour sauvegarder.</div>
+      <div style="height:12px"></div>
+
+      <div class="row">
+        <button id="btnExport" class="btn ghost">Exporter JSON</button>
+        <label class="btn ghost" style="display:inline-block">
+          Importer JSON
+          <input id="importFile" type="file" accept="application/json" style="display:none"/>
+        </label>
+      </div>
+
+      <div style="height:12px"></div>
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Points</th><th>Dernière maj</th></tr>
+        </thead>
+        <tbody id="clientsTable"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<script>
+  // ============ CONFIG ADMIN ============
+  // Change ce mot de passe (important)
+  const ADMIN_PASSWORD = "Emeraude2026!";
+
+  // ============ STORAGE LOCAL ============
+  const KEY = "emeraude_clients_v1";
+  function loadDB(){
+    try { return JSON.parse(localStorage.getItem(KEY) || "{}"); }
+    catch { return {}; }
+  }
+  function saveDB(db){
+    localStorage.setItem(KEY, JSON.stringify(db));
+  }
+
+  function nowISO(){
+    const d = new Date();
+    return d.toISOString().slice(0,19).replace("T"," ");
+  }
+
+  function renderTable(){
+    const db = loadDB();
+    const tbody = document.getElementById("clientsTable");
+    tbody.innerHTML = "";
+
+    const ids = Object.keys(db).sort((a,b)=> (db[b].points||0) - (db[a].points||0));
+    for (const id of ids){
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${id}</td><td>${db[id].points||0}</td><td>${db[id].updatedAt||""}</td>`;
+      tbody.appendChild(tr);
+    }
+  }
+
+  // ============ LOGIN ============
+  const loginCard = document.getElementById("loginCard");
+  const adminArea = document.getElementById("adminArea");
+  const loginMsg = document.getElementById("loginMsg");
+
+  document.getElementById("btnLogin").onclick = () => {
+    const pass = document.getElementById("adminPass").value;
+    if (pass === ADMIN_PASSWORD){
+      loginCard.style.display = "none";
+      adminArea.style.display = "grid";
+      startScanner();
+      renderTable();
+    } else {
+      loginMsg.textContent = "Mot de passe incorrect.";
+    }
+  };
+
+  // ============ SCANNER ============
+  let scanner = null;
+  let lastClient = null;
+
+  const clientIdEl = document.getElementById("clientId");
+  const clientPointsEl = document.getElementById("clientPoints");
+  const adminMsg = document.getElementById("adminMsg");
+
+  const btn1 = document.getElementById("btn1");
+  const btn2 = document.getElementById("btn2");
+  const btn3 = document.getElementById("btn3");
+  const btnMinus = document.getElementById("btnMinus");
+
+  function enableButtons(on){
+    btn1.disabled = btn2.disabled = btn3.disabled = btnMinus.disabled = !on;
+  }
+
+  function selectClient(id){
+    lastClient = id;
+    clientIdEl.textContent = id;
+    clientIdEl.className = "ok";
+
+    const db = loadDB();
+    if (!db[id]){
+      db[id] = { points: 0, updatedAt: nowISO(), lastAddAt: 0 };
+      saveDB(db);
+    }
+    clientPointsEl.textContent = db[id].points || 0;
+    enableButtons(true);
+  }
+
+  function startScanner(){
+    scanner = new Html5Qrcode("reader");
+    const config = { fps: 10, qrbox: { width: 260, height: 260 } };
+
+    scanner.start(
+      { facingMode: "environment" },
+      config,
+      (decodedText) => {
+        // QR contient juste l'ID (ex: EM-XXXX)
+        const id = String(decodedText || "").trim();
+        if (!id.startsWith("EM-")) return;
+
+        if (id !== lastClient){
+          selectClient(id);
+          adminMsg.textContent = "Client détecté ✅";
+        }
+      },
+      (err) => {}
+    ).catch(e => {
+      adminMsg.textContent = "Erreur caméra (HTTPS requis): " + e;
+    });
+  }
+
+  // ============ POINTS + anti-abus ============
+  function canAdd(db, id){
+    const now = Date.now();
+    const last = db[id]?.lastAddAt || 0;
+    return (now - last) >= 10000; // 10 sec
+  }
+
+  function updatePoints(delta){
+    if (!lastClient) return;
+    const db = loadDB();
+    if (!db[lastClient]) db[lastClient] = { points: 0, updatedAt: nowISO(), lastAddAt: 0 };
+
+    // anti-abus only when adding positive points
+    if (delta > 0 && !canAdd(db, lastClient)){
+      adminMsg.textContent = "⏳ Attends 10 secondes avant un nouvel ajout.";
+      return;
+    }
+
+    db[lastClient].points = Math.max(0, (db[lastClient].points || 0) + delta);
+    db[lastClient].updatedAt = nowISO();
+    if (delta > 0) db[lastClient].lastAddAt = Date.now();
+
+    saveDB(db);
+    clientPointsEl.textContent = db[lastClient].points;
+    adminMsg.textContent = `✅ ${delta > 0 ? "+" : ""}${delta} appliqué.`;
+    renderTable();
+  }
+
+  btn1.onclick = () => updatePoints(1);
+  btn2.onclick = () => updatePoints(2);
+  btn3.onclick = () => updatePoints(3);
+  btnMinus.onclick = () => updatePoints(-1);
+
+  // ============ EXPORT / IMPORT ============
+  document.getElementById("btnExport").onclick = () => {
+    const db = loadDB();
+    const blob = new Blob([JSON.stringify(db, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "emeraude_clients_backup.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  document.getElementById("importFile").addEventListener("change", async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    try{
+      const db = JSON.parse(text);
+      saveDB(db);
+      adminMsg.textContent = "✅ Import réussi.";
+      renderTable();
+    }catch{
+      adminMsg.textContent = "❌ Fichier JSON invalide.";
+    }
+  });
+
+  // reset all
+  document.getElementById("btnResetAll").onclick = () => {
+    if (confirm("Supprimer toute la base locale ?")){
+      localStorage.removeItem(KEY);
+      location.reload();
+    }
+  };
+</script>
+</body>
+</html>
